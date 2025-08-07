@@ -1,0 +1,67 @@
+.dark-theme {
+    background-color: #2a2e32;
+    color: #e4e4e4;
+}
+
+.card {
+    background-color: #3a3f44;
+    color: #e4e4e4;
+    border: none;
+}
+
+.table {
+    color: #e4e4e4;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Chat message styling */
+.message {
+    margin: 8px 0;
+    padding: 8px 12px;
+    border-radius: 8px;
+    max-width: 80%;
+}
+
+.message.user {
+    background-color: #4a8bc9;
+    color: white;
+    margin-left: auto;
+}
+
+.message.system {
+    background-color: #3a3f44;
+    color: #e0e0e0;
+    margin-right: auto;
+}
+
+.message.error {
+    background-color: #cc0000;
+    color: white;
+}
+
+.message-time {
+    font-size: 0.7em;
+    color: #aaa;
+    text-align: right;
+    margin-top: 4px;
+}
+
+#userQuestion {
+    width: calc(100% - 90px);
+    padding: 8px;
+    background: #3a3f44;
+    color: white;
+    border: 1px solid #555;
+}
+
+#askButton {
+    width: 80px;
+    padding: 8px;
+    background: #4a8bc9;
+    color: white;
+    border: none;
+    cursor: pointer;
+}

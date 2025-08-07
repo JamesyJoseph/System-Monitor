@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>System Monitor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root {
+            --checkmk-dark: #2a2e32;
+            --checkmk-green: #88b922;
+            --checkmk-red: #cc0000;
+            --checkmk-blue: #4a8bc9;
+        }
+        
+        body {
+            background-color: var(--checkmk-dark);
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .checkmk-panel {
+            background: rgba(45, 50, 55, 0.95);
+            border-radius: 3px;
+            border-top: 3px solid var(--checkmk-green);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .metric-value {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .cpu-value { color: var(--checkmk-blue); }
+        .memory-value { color: var(--checkmk-green); }
+        .disk-value { color: #ffaa33; }
+        
+        #metrics-chart {
+            height: 300px;
+            width: 100%;
+        }
+        
+        .chat-message {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <div class="row">
+            <!-- Metrics Column -->
+            <div class="col-md-8">
+                <div class="checkmk-panel">
+                    <h4><i class="fas fa-chart-line"></i> System Metrics</h4>
+                    <div id="metrics-chart"></div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="checkmk-panel text-center">
+                            <h5><i class="fas fa-microchip"></i> CPU</h5>
+                            <div class="metric-value cpu-value" id="cpu-value">--%</div>
+                            <small id="cpu-time">--:--:--</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="checkmk-panel text-center">
+                            <h5><i class="fas fa-memory"></i> Memory</h5>
+                            <div class="metric-value memory-value" id="memory-value">--%</div>
+                            <small id="memory-time">--:--:--</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="checkmk-panel text-center">
+                            <h5><i class="fas fa-hard-drive"></i> Disk</h5>
+                            <div class="metric-value disk-value" id="disk-value">--%</div>
+                            <small id="disk-time">--:--:--</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- File Upload Section -->
+                <div class="checkmk-panel">
+                    <h4><i class="fas fa-file-upload"></i> Upload Monitoring Files</h4>
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <input class="form-control bg-dark text-light" type="file" name="file" accept=".xml,.rrd">
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Upload
+                        </button>
+                    </form>
+                    <div id="uploadResult" class="mt-2"></div>
+                </div>
+            </div>
+            
+            <!-- AI Chat Column -->
+            <div class="col-md-4">
+                <div class="chat-container">
+                    <h4><i class="fas fa-robot"></i> System Assistant</h4>
+                    <div class="chat-message mb-3 p-3 bg-dark rounded" id="chatHistory">
+                        <div class="text-muted">Ask me about system status...</div>
+                    </div>
+                    <div class="input-group">
+                        <input type="text" class="form-control bg-dark text-light" id="userQuestion" placeholder="Ask a question..." autocomplete="off">
+                        <button class="btn btn-primary" id="askButton">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Real-time metrics updates
+        const socket = io();
+        const metricsData = {
+            timestamps: [],
+            cpu: [],
+            memory: [],
+            disk: []
+        };
+        
+        socket.on('connect', () => {
+            setInterval(() => socket.emit('request_update'), 2000);
+        });
+
+        socket.on('data_update', (data) => {
+            // Update metrics display
+            document.getElementById('cpu-value').textContent = data.cpu.toFixed(1) + '%';
+            document.getElementById('memory-value').textContent = data.memory.toFixed(1) + '%';
+            document.getElementById('disk-value').textContent = data.disk.toFixed(1) + '%';
+            
+            // Update chart data
+            metricsData.timestamps.push(data.timestamp);
+            metricsData.cpu.push(data.cpu);
+            metricsData.memory.push(data.memory);
+            metricsData.disk.push(data.disk);
+            
+            // Keep only last 30 data points
+            if (metricsData.timestamps.length > 30) {
+                metricsData.timestamps.shift();
+                metricsData.cpu.shift();
+                metricsData.memory.shift();
+                metricsData.disk.shift();
+            }
+            
+            // Update chart
+            updateChart();
+        });
+        
+        function updateChart() {
+            const chartData = [
+                {
+                    x: metricsData.timestamps,
+                    y: metricsData.cpu,
+                    name: 'CPU',
+                    line: {color: '#4a8bc9'}
+                },
+                {
+                    x: metricsData.timestamps,
+                    y: metricsData.memory,
+                    name: 'Memory',
+                    line: {color: '#88b922'}
+                },
+                {
+                    x: metricsData.timestamps,
+                    y: metricsData.disk,
+                    name: 'Disk',
+                    line: {color: '#ffaa33'}
+                }
+            ];
+            
+            Plotly.newPlot('metrics-chart', chartData, {
+                margin: {t: 0},
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: {color: '#e0e0e0'},
+                legend: {orientation: 'h', y: 1.1}
+            });
+        }
+        
+        // File upload handling
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                document.getElementById('uploadResult').innerHTML = `
+                    <div class="alert ${response.ok ? 'alert-success' : 'alert-danger'}">
+                        ${result.message || result.error}
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('uploadResult').innerHTML = `
+                    <div class="alert alert-danger">
+                        Upload failed: ${error.message}
+                    </div>
+                `;
+            }
+        });
+        
+        // Chat functionality - updated with input clearing
+        document.getElementById('askButton').addEventListener('click', async () => {
+            const questionInput = document.getElementById('userQuestion');
+            const question = questionInput.value.trim();
+            
+            if (!question) return;
+            
+            // Add user question to chat
+            addMessage(question, 'user');
+            
+            // Clear input immediately
+            questionInput.value = '';
+            
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({question})
+                });
+                
+                if (!response.ok) throw new Error('Network error');
+                const data = await response.json();
+                
+                // Add system response
+                addMessage(data.response, 'system');
+                
+            } catch (error) {
+                addMessage("Error getting response: " + error.message, 'error');
+            }
+        });
+
+        // Improved message display function
+        function addMessage(text, sender) {
+            const chatDiv = document.getElementById('chatHistory');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    ${text}
+                </div>
+                <div class="message-time">${new Date().toLocaleTimeString()}</div>
+            `;
+            chatDiv.appendChild(messageDiv);
+            chatDiv.scrollTop = chatDiv.scrollHeight;  // Auto-scroll to bottom
+        }
+    </script>
+</body>
+</html>
